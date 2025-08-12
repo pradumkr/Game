@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Treasure Island Math</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#eaf7ff; --card:#ffffff; --accent:#0b7cff; --accent-2:#ffb703; --good:#2ecc71; --bad:#ff6b6b;
+      --glass: rgba(255,255,255,0.6);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{background:linear-gradient(180deg,var(--bg),#dff3ff); display:flex; align-items:center; justify-content:center; padding:24px}
+
+    .game-wrap{width:980px; max-width:96vw; background:linear-gradient(180deg,var(--card),#f7fcff); border-radius:16px; box-shadow:0 12px 30px rgba(10,30,60,0.12); padding:18px; overflow:hidden}
+
+    header{display:flex; align-items:center; gap:12px}
+    h1{font-family:'Baloo 2',cursive; margin:0; font-size:24px; color:#074b8a}
+    .meta{margin-left:auto; text-align:right}
+    .meta small{display:block; font-size:12px; color:#6b7c93}
+
+    .stage{display:grid; grid-template-columns: 1fr 360px; gap:16px; margin-top:18px}
+
+    /* LEFT: map */
+    .map-card{background:linear-gradient(180deg,#dff4ff, #eaf9ff); padding:14px; border-radius:12px; border:1px solid rgba(11,124,255,0.06)}
+    .map{position:relative; height:260px; background:linear-gradient(180deg,#a6e1ff, #c9f0ff); border-radius:10px; overflow:hidden; display:flex; align-items:end}
+    .wave{position:absolute; left:-10%; bottom:0; width:120%; height:50%; background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.45), rgba(255,255,255,0) 40%); opacity:0.7}
+
+    .track{position:relative; width:100%; padding:18px}
+    .ship{position:absolute; top:50%; transform:translateY(-50%); width:90px; height:64px}
+    .treasure{position:absolute; right:9px; bottom:24px; width:68px}
+
+    .island{position:absolute; left:82%; bottom:0; transform:translateX(-50%); width:160px}
+
+    /* RIGHT: controls */
+    .panel{background:var(--card); border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(10,30,60,0.04)}
+    .question{font-size:20px; font-weight:600; margin-bottom:8px}
+    .input-row{display:flex; gap:8px}
+    input[type=number]{flex:1; padding:10px 12px; font-size:18px; border-radius:8px; border:1px solid #d6e8ff}
+    button{padding:10px 12px; background:var(--accent); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer}
+    button.secondary{background:var(--accent-2); color:#08304a}
+    .hint{font-size:13px; color:#33567a; margin-top:8px}
+
+    .progress-wrap{margin-top:12px}
+    .progress{height:18px; background:linear-gradient(90deg,#cfeeff,#e6fbff); border-radius:999px; border:1px solid rgba(11,124,255,0.08); overflow:hidden}
+    .progress > i{display:block; height:100%; background:linear-gradient(90deg,var(--accent), #2bd1ff); width:0%}
+
+    .badges{display:flex; gap:8px; margin-top:12px; align-items:center}
+    .badge{padding:6px 10px; background:var(--glass); border-radius:999px; font-weight:600; font-size:13px}
+
+    .footer{display:flex; gap:8px; margin-top:12px; align-items:center}
+
+    /* finish overlay */
+    .overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, rgba(3,24,48,0.2), rgba(3,24,48,0.2)); pointer-events:none; opacity:0; transition:opacity .25s}
+    .overlay.show{opacity:1; pointer-events:auto}
+    .modal{background:white; padding:18px; border-radius:12px; text-align:center; box-shadow:0 18px 50px rgba(0,0,0,0.12)}
+    .modal h2{margin:6px 0 0 0}
+    .small{font-size:13px; color:#3b516a}
+
+    /* cute ship svg tweaks */
+    .sparkles{position:absolute; width:14px; height:14px}
+
+    @media (max-width:880px){
+      .stage{grid-template-columns:1fr;}
+      .map{height:220px}
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrap" role="application" aria-label="Treasure Island Math game">
+    <header>
+      <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><circle cx='24' cy='24' r='22' fill='%230b7cff'/><text x='50%' y='58%' font-family='Baloo 2, Arial' font-size='20' fill='white' text-anchor='middle'>TM</text></svg>" alt="logo" style="width:48px;height:48px;border-radius:10px;">
+      <div>
+        <h1>Treasure Island Math</h1>
+        <div style="color:#52758d;font-size:13px">Answer questions — Move the ship — Find the treasure</div>
+      </div>
+      <div class="meta">
+        <small>Correct: <span id="correctCount">0</span> / <strong id="goalCount">5</strong></small>
+        <small>Best: <span id="best">0</span></small>
+      </div>
+    </header>
+
+    <div class="stage">
+      <div class="map-card">
+        <div class="map" aria-hidden="true">
+          <div class="wave"></div>
+          <div class="track" id="track">
+            <!-- Ship (SVG) -->
+            <div id="ship" class="ship" style="left:6%;">
+              <svg viewBox="0 0 120 80" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <g>
+                  <ellipse cx="60" cy="70" rx="36" ry="8" fill="#5b8fbf" opacity="0.9"></ellipse>
+                  <rect x="36" y="22" width="48" height="20" rx="4" fill="#ff7a00"></rect>
+                  <path d="M48 22 L60 6 L72 22 Z" fill="#ff9700"></path>
+                  <rect x="58" y="12" width="4" height="30" fill="#6b3b00"></rect>
+                  <polygon points="62,18 88,30 62,30" fill="#fff" opacity="0.95"></polygon>
+                </g>
+              </svg>
+            </div>
+
+            <!-- island & treasure -->
+            <div class="island" style="bottom:8px;">
+              <svg viewBox="0 0 240 120" width="100%" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="120" cy="100" rx="120" ry="20" fill="#ffd27f"/>
+                <path d="M30 100 C60 60,180 60,210 100 Z" fill="#ffeaa3"/>
+                <circle cx="80" cy="60" r="6" fill="#2ecc71"/>
+                <circle cx="160" cy="50" r="8" fill="#2ecc71"/>
+              </svg>
+            </div>
+
+            <div id="treasure" class="treasure" style="right:12px; bottom:8px;">
+              <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" width="68" height="68">
+                <rect x="6" y="24" width="68" height="40" rx="6" fill="#b8860b" stroke="#7a5300" stroke-width="2"/>
+                <rect x="20" y="6" width="40" height="20" rx="6" fill="#ffd86b" stroke="#b8860b" stroke-width="2"/>
+                <circle cx="40" cy="44" r="6" fill="#ffec99"/>
+              </svg>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" aria-live="polite">
+        <div class="question" id="question">What is 2 + 3 ?</div>
+        <div class="input-row">
+          <input id="answer" type="number" inputmode="numeric" aria-label="Your answer" placeholder="Type answer" />
+          <button id="checkBtn">Check</button>
+          <button id="skipBtn" class="secondary">Skip</button>
+        </div>
+
+        <div class="hint" id="hint">Tip: You can press Enter to submit.</div>
+
+        <div class="progress-wrap">
+          <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+        </div>
+
+        <div class="badges">
+          <div class="badge">Level: <span id="level">1</span></div>
+          <div class="badge">Streak: <span id="streak">0</span></div>
+          <div class="badge" title="Experience points">XP: <span id="xp">0</span></div>
+        </div>
+
+        <div class="footer">
+          <button id="restart" class="secondary">Restart</button>
+          <div style="margin-left:auto;color:#547089;font-size:13px">Made for your niece ❤️</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- overlay -->
+    <div id="overlay" class="overlay" role="dialog" aria-modal="true">
+      <div class="modal" id="modalContent">
+        <h2 id="modalTitle">You found the treasure!</h2>
+        <p class="small" id="modalText">Great job — you solved the puzzles and reached the island.</p>
+        <div style="margin-top:12px"><button id="playAgain">Play Again</button></div>
+      </div>
+    </div>
+
+    <!-- confetti canvas -->
+    <canvas id="confettiCanvas" style="position:absolute; left:0; top:0; pointer-events:none;"></canvas>
+  </div>
+
+  <script>
+    // Simple Treasure Island Math game (single-file)
+    (()=>{
+      const goal = 5; // # of correct to win
+      const correctCountEl = document.getElementById('correctCount');
+      const goalCountEl = document.getElementById('goalCount');
+      const bestEl = document.getElementById('best');
+      const questionEl = document.getElementById('question');
+      const answerEl = document.getElementById('answer');
+      const checkBtn = document.getElementById('checkBtn');
+      const skipBtn = document.getElementById('skipBtn');
+      const restartBtn = document.getElementById('restart');
+      const playAgainBtn = document.getElementById('playAgain');
+      const overlay = document.getElementById('overlay');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalText = document.getElementById('modalText');
+      const progressBar = document.getElementById('progressBar');
+      const ship = document.getElementById('ship');
+      const treasure = document.getElementById('treasure');
+      const levelEl = document.getElementById('level');
+      const streakEl = document.getElementById('streak');
+      const xpEl = document.getElementById('xp');
+
+      goalCountEl.textContent = goal;
+
+      let correct = 0; let best = localStorage.getItem('treasure_best')||0;
+      bestEl.textContent = best;
+
+      let currentAnswer = null;
+      let level = 1; let streak = 0; let xp = 0;
+
+      function randInt(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+
+      function makeQuestion(){
+        // difficulty grows with level: choose operation and range
+        const ops = ['+','-','*'];
+        const op = ops[Math.min(2, Math.floor((level-1)/2))];
+        const max = 5 + level*3;
+        let a = randInt(1, max);
+        let b = randInt(1, max);
+        if(op==='-' && b>a) [a,b]=[b,a];
+        if(op==='*'){
+          a = randInt(1, Math.max(3, Math.floor(max/3)));
+          b = randInt(1, Math.max(3, Math.floor(max/3)));
+        }
+        currentAnswer = eval(a+op+b);
+        questionEl.textContent = `What is ${a} ${op} ${b} ?`;
+      }
+
+      function updateUI(){
+        correctCountEl.textContent = correct;
+        levelEl.textContent = level;
+        streakEl.textContent = streak;
+        xpEl.textContent = xp;
+        const pct = Math.round((correct/goal)*100);
+        progressBar.style.width = pct + '%';
+        // move ship proportionally
+        const left = 6 + (correct/goal)*80; // percent positions
+        ship.style.left = left + '%';
+      }
+
+      function playTone(type){
+        try{
+          const ctx = new (window.AudioContext||window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = type==='good'?'sine':'square';
+          o.frequency.value = type==='good'?880:220;
+          g.gain.value = 0.04;
+          o.connect(g); g.connect(ctx.destination);
+          o.start();
+          setTimeout(()=>{o.stop(); ctx.close()}, 120);
+        }catch(e){/*ignore*/}
+      }
+
+      function showModal(win){
+        overlay.classList.add('show');
+        if(win){
+          modalTitle.textContent = '🏆 You found the treasure!';
+          modalText.textContent = `Amazing! You answered ${goal} questions and earned ${xp} XP.`;
+          startConfetti();
+        } else {
+          modalTitle.textContent = 'Keep going!';
+          modalText.textContent = 'Try again to find the treasure.';
+        }
+      }
+
+      function hideModal(){ overlay.classList.remove('show'); stopConfetti(); }
+
+      checkBtn.addEventListener('click', onCheck);
+      answerEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') onCheck(); });
+      skipBtn.addEventListener('click', ()=>{ streak=0; xp = Math.max(0, xp-1); makeQuestion(); updateUI(); });
+      restartBtn.addEventListener('click', resetGame);
+      playAgainBtn.addEventListener('click', ()=>{ hideModal(); resetGame(); });
+
+      function onCheck(){
+        const val = answerEl.value.trim();
+        if(val==='') return;
+        const num = Number(val);
+        if(Number.isNaN(num)) return;
+        if(num === currentAnswer){
+          correct += 1; streak += 1; xp += 5 + level;
+          playTone('good');
+          animateShip();
+        } else {
+          streak = 0; xp = Math.max(0, xp-2);
+          playTone('bad');
+          shake(answerEl);
+          // little hint
+          modalTitle.textContent = "Oops! That's not right";
+          modalText.textContent = `The correct answer was ${currentAnswer}. Try the next one!`;
+          overlay.classList.add('show');
+          setTimeout(()=>{ overlay.classList.remove('show') }, 900);
+        }
+        answerEl.value = '';
+        makeQuestion();
+        // level-up logic
+        if(streak && streak%3===0) level = Math.min(10, level+1);
+        if(correct >= goal) finishGame();
+        updateUI();
+      }
+
+      function shake(el){
+        el.animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:320});
+      }
+
+      function animateShip(){
+        // quick sparkle
+        const s = ship;
+        s.animate([{transform:'translateY(-50%) scale(1)'},{transform:'translateY(-60%) scale(1.02)'},{transform:'translateY(-50%) scale(1)'}],{duration:420});
+      }
+
+      function finishGame(){
+        playTone('good');
+        xp += 20; // bonus
+        if(correct > (localStorage.getItem('treasure_best')||0)){
+          localStorage.setItem('treasure_best', correct);
+          bestEl.textContent = correct;
+        }
+        updateUI();
+        showModal(true);
+      }
+
+      function resetGame(){
+        correct = 0; level = 1; streak = 0; xp = 0; updateUI(); makeQuestion(); hideModal();
+      }
+
+      // --- Confetti ---
+      const confettiCanvas = document.getElementById('confettiCanvas');
+      let confettiCtx, confettiTimer, confettiPieces=[];
+      function resizeConfetti(){ confettiCanvas.width = document.querySelector('.game-wrap').offsetWidth; confettiCanvas.height = document.querySelector('.game-wrap').offsetHeight; confettiCanvas.style.left = document.querySelector('.game-wrap').offsetLeft + 'px'; confettiCanvas.style.top = document.querySelector('.game-wrap').offsetTop + 'px'; }
+      window.addEventListener('resize', resizeConfetti);
+      function startConfetti(){
+        resizeConfetti(); confettiCtx = confettiCanvas.getContext('2d'); confettiPieces = [];
+        for(let i=0;i<80;i++) confettiPieces.push({x:Math.random()*confettiCanvas.width, y:Math.random()*confettiCanvas.height - confettiCanvas.height, r: (4+Math.random()*8), s: (1+Math.random()*3), c: `hsl(${Math.floor(Math.random()*360)},70%,60%)`, rot: Math.random()*360, vel: 1+Math.random()*3});
+        confettiTimer = setInterval(()=>{ renderConfetti() }, 1000/60);
+      }
+      function renderConfetti(){
+        confettiCtx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+        for(let p of confettiPieces){
+          p.y += p.vel; p.rot += p.s*0.5; if(p.y>confettiCanvas.height+20){ p.y = -10; p.x = Math.random()*confettiCanvas.width; }
+          confettiCtx.save(); confettiCtx.translate(p.x,p.y); confettiCtx.rotate(p.rot*Math.PI/180);
+          confettiCtx.fillStyle = p.c; confettiCtx.fillRect(-p.r/2,-p.r/2,p.r,p.r*1.6);
+          confettiCtx.restore();
+        }
+      }
+      function stopConfetti(){ clearInterval(confettiTimer); if(confettiCtx) confettiCtx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height); }
+
+      // init
+      makeQuestion(); updateUI(); answerEl.focus();
+    })();
+  </script>
+</body>
+</html>
